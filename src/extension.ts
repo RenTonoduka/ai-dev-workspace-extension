@@ -4,6 +4,9 @@
 
 import * as vscode from 'vscode';
 import { GitService } from './services/GitService';
+import { WorktreeManager } from './services/WorktreeManager';
+import { WorktreeProvider, WorktreeExplorer, WorktreeTreeItem } from './providers/WorktreeProvider';
+import { WorktreeCreateOptions } from './types';
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('AI Dev Workspace extension is now active');
@@ -16,7 +19,14 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   const rootPath = workspaceFolders[0].uri.fsPath;
+
+  // Initialize services
   const gitService = new GitService(rootPath);
+  const worktreeManager = new WorktreeManager(gitService, rootPath);
+
+  // Initialize TreeView
+  const worktreeProvider = new WorktreeProvider(gitService);
+  const worktreeExplorer = new WorktreeExplorer(context, worktreeProvider);
 
   // Validate Git repository
   gitService.isGitRepository().then(isRepo => {
@@ -39,64 +49,86 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   // Register commands
-  const createWorktreeCommand = vscode.commands.registerCommand(
-    'aiDevWorkspace.createWorktree',
-    async () => {
-      await createWorktree(gitService);
-    }
-  );
+  registerCommands(context, gitService, worktreeManager, worktreeProvider);
+}
 
-  const listWorktreesCommand = vscode.commands.registerCommand(
-    'aiDevWorkspace.listWorktrees',
-    async () => {
-      await listWorktrees(gitService);
-    }
-  );
-
-  const removeWorktreeCommand = vscode.commands.registerCommand(
-    'aiDevWorkspace.removeWorktree',
-    async () => {
-      await removeWorktree(gitService);
-    }
-  );
-
-  const openWorktreeTerminalCommand = vscode.commands.registerCommand(
-    'aiDevWorkspace.openWorktreeTerminal',
-    async (worktreePath?: string) => {
-      await openWorktreeTerminal(worktreePath);
-    }
-  );
-
-  const startAICLICommand = vscode.commands.registerCommand(
-    'aiDevWorkspace.startAICLI',
-    async (worktreePath?: string) => {
-      await startAICLI(worktreePath);
-    }
-  );
-
-  const refreshWorktreesCommand = vscode.commands.registerCommand(
-    'aiDevWorkspace.refreshWorktrees',
-    async () => {
-      vscode.window.showInformationMessage('Refreshing worktrees...');
-      // TreeView refresh will be implemented later
-    }
-  );
-
+/**
+ * Register all extension commands
+ */
+function registerCommands(
+  context: vscode.ExtensionContext,
+  gitService: GitService,
+  worktreeManager: WorktreeManager,
+  worktreeProvider: WorktreeProvider
+): void {
+  // Create worktree command
   context.subscriptions.push(
-    createWorktreeCommand,
-    listWorktreesCommand,
-    removeWorktreeCommand,
-    openWorktreeTerminalCommand,
-    startAICLICommand,
-    refreshWorktreesCommand
+    vscode.commands.registerCommand('aiDevWorkspace.createWorktree', async () => {
+      await createWorktree(gitService, worktreeManager, worktreeProvider);
+    })
+  );
+
+  // List worktrees command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('aiDevWorkspace.listWorktrees', async () => {
+      await listWorktrees(gitService);
+    })
+  );
+
+  // Remove worktree command (from command palette)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('aiDevWorkspace.removeWorktree', async () => {
+      await removeWorktreeFromPalette(gitService, worktreeManager, worktreeProvider);
+    })
+  );
+
+  // Remove worktree from TreeView item
+  context.subscriptions.push(
+    vscode.commands.registerCommand('aiDevWorkspace.removeWorktreeItem', async (item: WorktreeTreeItem) => {
+      const success = await worktreeManager.removeWorktree(item.worktree);
+      if (success) {
+        worktreeProvider.refresh();
+      }
+    })
+  );
+
+  // Open terminal in worktree
+  context.subscriptions.push(
+    vscode.commands.registerCommand('aiDevWorkspace.openWorktreeTerminal', async (pathOrItem: string | WorktreeTreeItem) => {
+      const path = typeof pathOrItem === 'string' ? pathOrItem : pathOrItem.worktree.path;
+      await worktreeManager.openTerminal(path);
+    })
+  );
+
+  // Start AI CLI
+  context.subscriptions.push(
+    vscode.commands.registerCommand('aiDevWorkspace.startAICLI', async (pathOrItem: string | WorktreeTreeItem) => {
+      const path = typeof pathOrItem === 'string' ? pathOrItem : pathOrItem.worktree.path;
+      await worktreeManager.startAICLI(path);
+    })
+  );
+
+  // Open worktree in new window
+  context.subscriptions.push(
+    vscode.commands.registerCommand('aiDevWorkspace.openWorktreeWindow', async (item: WorktreeTreeItem) => {
+      await vscode.commands.executeCommand(
+        'vscode.openFolder',
+        vscode.Uri.file(item.worktree.path),
+        true // Open in new window
+      );
+    })
   );
 }
 
 /**
- * Create a new worktree
+ * Create a new worktree with interactive UI
  */
-async function createWorktree(gitService: GitService) {
-  // Get worktree name
+async function createWorktree(
+  gitService: GitService,
+  worktreeManager: WorktreeManager,
+  worktreeProvider: WorktreeProvider
+): Promise<void> {
+  // Step 1: Get worktree name
   const name = await vscode.window.showInputBox({
     prompt: 'Enter worktree name',
     placeHolder: 'feature-auth',
@@ -115,15 +147,17 @@ async function createWorktree(gitService: GitService) {
     return;
   }
 
-  // Get branch name
+  // Step 2: Get branch name
   const branches = await gitService.getAllBranches();
   const branchItems = [
-    { label: '$(add) Create new branch', value: '__new__' },
+    { label: '$(add) Create new branch', description: 'Start fresh branch', value: '__new__' },
+    { label: '$(git-branch) Use existing branch', description: 'Select from list', value: '__existing__', kind: vscode.QuickPickItemKind.Separator },
     ...branches.map(b => ({ label: b, value: b }))
   ];
 
   const selectedBranch = await vscode.window.showQuickPick(branchItems, {
-    placeHolder: 'Select branch or create new'
+    placeHolder: 'Select branch or create new',
+    matchOnDescription: true
   });
 
   if (!selectedBranch) {
@@ -136,7 +170,13 @@ async function createWorktree(gitService: GitService) {
   if (selectedBranch.value === '__new__') {
     const newBranch = await vscode.window.showInputBox({
       prompt: 'Enter new branch name',
-      placeHolder: 'feature/user-authentication'
+      placeHolder: 'feature/user-authentication',
+      validateInput: (value) => {
+        if (!value) {
+          return 'Branch name is required';
+        }
+        return null;
+      }
     });
 
     if (!newBranch) {
@@ -145,59 +185,64 @@ async function createWorktree(gitService: GitService) {
 
     branch = newBranch;
     createBranch = true;
+  } else if (selectedBranch.value === '__existing__') {
+    return; // Separator clicked, do nothing
   } else {
     branch = selectedBranch.value;
   }
 
-  // Get base path
+  // Step 3: Select AI CLI tools (multi-select)
   const config = vscode.workspace.getConfiguration('aiDevWorkspace');
-  const defaultLocation = config.get<string>('defaultWorktreeLocation', '../');
-  const workspaceFolders = vscode.workspace.workspaceFolders;
+  const cliTools = config.get<Record<string, any>>('cliTools', {});
 
-  if (!workspaceFolders) {
+  const cliToolItems = Object.entries(cliTools)
+    .filter(([_, cfg]) => cfg.enabled)
+    .map(([name, cfg]) => ({
+      label: name,
+      description: cfg.command,
+      picked: false
+    }));
+
+  const selectedTools = await vscode.window.showQuickPick(cliToolItems, {
+    placeHolder: 'Select AI CLI tools to start (optional, multi-select)',
+    canPickMany: true
+  });
+
+  const cliToolNames = selectedTools ? selectedTools.map(t => t.label) : [];
+
+  // Step 4: Create worktree with options
+  const defaultLocation = config.get<string>('defaultWorktreeLocation', '../');
+  const autoOpenWindow = config.get<boolean>('autoOpenNewWindow', true);
+  const autoStartTerminal = config.get<boolean>('autoStartTerminal', true);
+
+  const options: WorktreeCreateOptions = {
+    name: `project-${name}`,
+    branch,
+    basePath: defaultLocation,
+    createBranch,
+    cliTools: cliToolNames,
+    openInNewWindow: autoOpenWindow,
+    autoStartTerminal: autoStartTerminal && cliToolNames.length > 0
+  };
+
+  // Validate options
+  const errors = await worktreeManager.validateCreateOptions(options);
+  if (errors.length > 0) {
+    vscode.window.showErrorMessage(`Cannot create worktree:\n${errors.join('\n')}`);
     return;
   }
 
-  const rootPath = workspaceFolders[0].uri.fsPath;
-  const worktreePath = vscode.Uri.joinPath(
-    vscode.Uri.file(rootPath),
-    defaultLocation,
-    `project-${name}`
-  ).fsPath;
-
   // Create worktree
-  await vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: 'Creating worktree...',
-      cancellable: false
-    },
-    async () => {
-      const result = await gitService.createWorktree(worktreePath, branch, createBranch);
-
-      if (result.success) {
-        vscode.window.showInformationMessage(`Worktree created: ${name}`);
-
-        // Open in new window if configured
-        const autoOpen = config.get<boolean>('autoOpenNewWindow', true);
-        if (autoOpen) {
-          await vscode.commands.executeCommand(
-            'vscode.openFolder',
-            vscode.Uri.file(worktreePath),
-            true
-          );
-        }
-      } else {
-        vscode.window.showErrorMessage(`Failed to create worktree: ${result.error}`);
-      }
-    }
-  );
+  const success = await worktreeManager.createWorktree(options);
+  if (success) {
+    worktreeProvider.refresh();
+  }
 }
 
 /**
- * List all worktrees
+ * List all worktrees (command palette)
  */
-async function listWorktrees(gitService: GitService) {
+async function listWorktrees(gitService: GitService): Promise<void> {
   const worktrees = await gitService.listWorktrees();
 
   if (worktrees.length === 0) {
@@ -224,9 +269,13 @@ async function listWorktrees(gitService: GitService) {
 }
 
 /**
- * Remove a worktree
+ * Remove worktree from command palette
  */
-async function removeWorktree(gitService: GitService) {
+async function removeWorktreeFromPalette(
+  gitService: GitService,
+  worktreeManager: WorktreeManager,
+  worktreeProvider: WorktreeProvider
+): Promise<void> {
   const worktrees = await gitService.listWorktrees();
   const nonMainWorktrees = worktrees.filter(wt => !wt.isMain);
 
@@ -250,104 +299,10 @@ async function removeWorktree(gitService: GitService) {
     return;
   }
 
-  const confirm = await vscode.window.showWarningMessage(
-    `Remove worktree "${selected.label}"? This cannot be undone.`,
-    { modal: true },
-    'Remove'
-  );
-
-  if (confirm !== 'Remove') {
-    return;
+  const success = await worktreeManager.removeWorktree(selected.worktree);
+  if (success) {
+    worktreeProvider.refresh();
   }
-
-  await vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: 'Removing worktree...',
-      cancellable: false
-    },
-    async () => {
-      const result = await gitService.removeWorktree(selected.worktree.path);
-
-      if (result.success) {
-        vscode.window.showInformationMessage(`Worktree removed: ${selected.label}`);
-      } else {
-        vscode.window.showErrorMessage(`Failed to remove worktree: ${result.error}`);
-      }
-    }
-  );
-}
-
-/**
- * Open terminal in worktree
- */
-async function openWorktreeTerminal(worktreePath?: string) {
-  let targetPath = worktreePath;
-
-  if (!targetPath) {
-    const currentPath = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
-    targetPath = currentPath;
-  }
-
-  if (!targetPath) {
-    vscode.window.showErrorMessage('No worktree path specified');
-    return;
-  }
-
-  const terminal = vscode.window.createTerminal({
-    name: `Worktree: ${targetPath.split('/').pop()}`,
-    cwd: targetPath
-  });
-
-  terminal.show();
-}
-
-/**
- * Start AI CLI in worktree
- */
-async function startAICLI(worktreePath?: string) {
-  const config = vscode.workspace.getConfiguration('aiDevWorkspace');
-  const cliTools = config.get<Record<string, any>>('cliTools', {});
-
-  const enabledTools = Object.entries(cliTools)
-    .filter(([_, cfg]) => cfg.enabled)
-    .map(([name, cfg]) => ({
-      label: name,
-      description: cfg.command,
-      config: cfg
-    }));
-
-  if (enabledTools.length === 0) {
-    vscode.window.showWarningMessage('No AI CLI tools are enabled');
-    return;
-  }
-
-  const selected = await vscode.window.showQuickPick(enabledTools, {
-    placeHolder: 'Select AI CLI to start'
-  });
-
-  if (!selected) {
-    return;
-  }
-
-  let targetPath = worktreePath;
-  if (!targetPath) {
-    targetPath = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
-  }
-
-  if (!targetPath) {
-    vscode.window.showErrorMessage('No worktree path specified');
-    return;
-  }
-
-  const terminal = vscode.window.createTerminal({
-    name: `${selected.label}: ${targetPath.split('/').pop()}`,
-    cwd: targetPath,
-    env: selected.config.env
-  });
-
-  terminal.show();
-  terminal.sendText(`${selected.config.command} ${selected.config.args.join(' ')}`);
 }
 
 export function deactivate() {

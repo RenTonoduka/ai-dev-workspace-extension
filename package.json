@@ -55,6 +55,16 @@
         "command": "aiDevWorkspace.refreshWorktrees",
         "title": "AI Dev: Refresh Worktree List",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "aiDevWorkspace.openWorktreeWindow",
+        "title": "AI Dev: Open Worktree in New Window",
+        "icon": "$(window)"
+      },
+      {
+        "command": "aiDevWorkspace.removeWorktreeItem",
+        "title": "AI Dev: Remove Worktree",
+        "icon": "$(trash)"
       }
     ],
     "viewsContainers": {
@@ -101,7 +111,22 @@
           "group": "inline@2"
         },
         {
-          "command": "aiDevWorkspace.removeWorktree",
+          "command": "aiDevWorkspace.openWorktreeWindow",
+          "when": "view == worktreeExplorer && viewItem == worktree",
+          "group": "1_navigation@1"
+        },
+        {
+          "command": "aiDevWorkspace.openWorktreeTerminal",
+          "when": "view == worktreeExplorer && viewItem == worktree",
+          "group": "2_workspace@1"
+        },
+        {
+          "command": "aiDevWorkspace.startAICLI",
+          "when": "view == worktreeExplorer && viewItem == worktree",
+          "group": "2_workspace@2"
+        },
+        {
+          "command": "aiDevWorkspace.removeWorktreeItem",
           "when": "view == worktreeExplorer && viewItem == worktree",
           "group": "7_modification"
         }
