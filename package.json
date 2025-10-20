@@ -187,14 +187,14 @@
               "enabled": true,
               "env": {}
             },
-            "cursor": {
-              "command": "open",
-              "args": ["-a", "Cursor", "."],
+            "codex": {
+              "command": "codex",
+              "args": [],
               "enabled": true,
               "env": {}
             },
-            "cursor-cli": {
-              "command": "/Applications/Cursor.app/Contents/Resources/app/bin/cursor",
+            "cursor": {
+              "command": "cursor",
               "args": [],
               "enabled": false,
               "env": {}
@@ -206,9 +206,9 @@
               "env": {}
             },
             "gemini": {
-              "command": "gemini-cli",
-              "args": ["--model", "gemini-2.0-flash"],
-              "enabled": false,
+              "command": "gemini",
+              "args": [],
+              "enabled": true,
               "env": {}
             }
           },
