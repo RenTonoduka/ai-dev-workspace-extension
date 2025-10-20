@@ -65,6 +65,11 @@
         "command": "aiDevWorkspace.removeWorktreeItem",
         "title": "AI Dev: Remove Worktree",
         "icon": "$(trash)"
+      },
+      {
+        "command": "aiDevWorkspace.validateCLITools",
+        "title": "AI Dev: Validate CLI Tools",
+        "icon": "$(check)"
       }
     ],
     "viewsContainers": {
@@ -149,6 +154,9 @@
         },
         {
           "command": "aiDevWorkspace.refreshWorktrees"
+        },
+        {
+          "command": "aiDevWorkspace.validateCLITools"
         }
       ]
     },
@@ -179,22 +187,28 @@
               "enabled": true,
               "env": {}
             },
+            "cursor": {
+              "command": "open",
+              "args": ["-a", "Cursor", "."],
+              "enabled": true,
+              "env": {}
+            },
+            "cursor-cli": {
+              "command": "/Applications/Cursor.app/Contents/Resources/app/bin/cursor",
+              "args": [],
+              "enabled": false,
+              "env": {}
+            },
             "aider": {
               "command": "aider",
               "args": [],
-              "enabled": true,
+              "enabled": false,
               "env": {}
             },
             "gemini": {
               "command": "gemini-cli",
               "args": ["--model", "gemini-2.0-flash"],
               "enabled": false,
-              "env": {}
-            },
-            "codex": {
-              "command": "cursor",
-              "args": [],
-              "enabled": true,
               "env": {}
             }
           },

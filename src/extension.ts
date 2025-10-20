@@ -7,6 +7,7 @@ import { GitService } from './services/GitService';
 import { WorktreeManager } from './services/WorktreeManager';
 import { WorktreeProvider, WorktreeExplorer, WorktreeTreeItem } from './providers/WorktreeProvider';
 import { WorktreeCreateOptions } from './types';
+import { CLIValidator } from './services/CLIValidator';
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('AI Dev Workspace extension is now active');
@@ -118,6 +119,11 @@ function registerCommands(
       );
     })
   );
+
+  // Validate CLI tools
+  context.subscriptions.push(
+    vscode.commands.registerCommand('aiDevWorkspace.validateCLITools', handleValidateCLITools)
+  );
 }
 
 /**
@@ -209,6 +215,15 @@ async function createWorktree(
   });
 
   const cliToolNames = selectedTools ? selectedTools.map(t => t.label) : [];
+
+  // Validate selected CLI tools
+  if (cliToolNames.length > 0) {
+    const validator = CLIValidator.getInstance();
+    const canContinue = await validator.checkBeforeCreate(cliToolNames);
+    if (!canContinue) {
+      return; // User cancelled or wants to setup tools first
+    }
+  }
 
   // Step 4: Create worktree with options
   const defaultLocation = config.get<string>('defaultWorktreeLocation', '../');
@@ -303,6 +318,25 @@ async function removeWorktreeFromPalette(
   if (success) {
     worktreeProvider.refresh();
   }
+}
+
+/**
+ * Validate CLI Tools Command Handler
+ */
+async function handleValidateCLITools() {
+  const validator = CLIValidator.getInstance();
+
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: 'Validating CLI tools...',
+      cancellable: false
+    },
+    async () => {
+      const results = await validator.validateAllTools();
+      await validator.showValidationResults(results);
+    }
+  );
 }
 
 export function deactivate() {
