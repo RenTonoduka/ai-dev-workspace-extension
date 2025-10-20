@@ -199,12 +199,6 @@
               "enabled": false,
               "env": {}
             },
-            "aider": {
-              "command": "aider",
-              "args": [],
-              "enabled": false,
-              "env": {}
-            },
             "gemini": {
               "command": "gemini",
               "args": [],
