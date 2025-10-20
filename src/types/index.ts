@@ -18,6 +18,8 @@ export interface WorktreeInfo {
   isLocked: boolean;
   /** Number of uncommitted changes */
   changes?: number;
+  /** Active AI CLI tools running on this worktree */
+  activeCLIs?: string[];
 }
 
 /**

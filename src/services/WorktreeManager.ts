@@ -6,12 +6,17 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { GitService } from './GitService';
 import { WorktreeCreateOptions, WorktreeInfo, CLIToolConfig } from '../types';
+import { TerminalTracker } from './TerminalTracker';
 
 export class WorktreeManager {
+  private terminalTracker: TerminalTracker;
+
   constructor(
     private gitService: GitService,
     private rootPath: string
-  ) {}
+  ) {
+    this.terminalTracker = TerminalTracker.getInstance();
+  }
 
   /**
    * Create a new worktree with full setup
@@ -199,15 +204,19 @@ export class WorktreeManager {
     ].join(' ');
 
     terminal.sendText(command);
+
+    // Track the terminal
+    this.terminalTracker.trackTerminal(terminal, worktreePath, selectedTool.name);
   }
 
   /**
-   * Start multiple CLI tools in worktree
+   * Start multiple CLI tools in worktree in parallel
    */
   private async startCLITools(worktreePath: string, cliToolNames: string[]): Promise<void> {
-    for (const toolName of cliToolNames) {
-      await this.startAICLI(worktreePath, toolName);
-    }
+    // Launch all CLIs in parallel using Promise.all
+    await Promise.all(
+      cliToolNames.map(toolName => this.startAICLI(worktreePath, toolName))
+    );
   }
 
   /**

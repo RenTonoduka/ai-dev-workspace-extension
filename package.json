@@ -190,6 +190,12 @@
               "args": ["--model", "gemini-2.0-flash"],
               "enabled": false,
               "env": {}
+            },
+            "codex": {
+              "command": "cursor",
+              "args": [],
+              "enabled": true,
+              "env": {}
             }
           },
           "description": "Configuration for AI CLI tools",

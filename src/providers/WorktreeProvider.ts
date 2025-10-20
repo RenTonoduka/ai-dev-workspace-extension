@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { GitService } from '../services/GitService';
 import { WorktreeInfo } from '../types';
+import { TerminalTracker } from '../services/TerminalTracker';
 
 /**
  * Worktree tree item for VSCode TreeView
@@ -45,6 +46,10 @@ export class WorktreeTreeItem extends vscode.TreeItem {
       lines.push(`Changes: ${this.worktree.changes} file(s)`);
     }
 
+    if (this.worktree.activeCLIs && this.worktree.activeCLIs.length > 0) {
+      lines.push(`Running: ${this.worktree.activeCLIs.join(', ')}`);
+    }
+
     if (this.worktree.isMain) {
       lines.push('(Main worktree)');
     }
@@ -70,6 +75,11 @@ export class WorktreeTreeItem extends vscode.TreeItem {
       parts.push(`${this.worktree.changes} change${this.worktree.changes > 1 ? 's' : ''}`);
     }
 
+    // Active CLIs
+    if (this.worktree.activeCLIs && this.worktree.activeCLIs.length > 0) {
+      parts.push(`🤖 ${this.worktree.activeCLIs.join(', ')}`);
+    }
+
     return parts.join(' • ');
   }
 
@@ -83,6 +93,11 @@ export class WorktreeTreeItem extends vscode.TreeItem {
 
     if (this.worktree.isLocked) {
       return new vscode.ThemeIcon('lock', new vscode.ThemeColor('charts.red'));
+    }
+
+    // Show robot icon if CLIs are running
+    if (this.worktree.activeCLIs && this.worktree.activeCLIs.length > 0) {
+      return new vscode.ThemeIcon('robot', new vscode.ThemeColor('charts.purple'));
     }
 
     if (this.worktree.changes && this.worktree.changes > 0) {
@@ -99,8 +114,16 @@ export class WorktreeTreeItem extends vscode.TreeItem {
 export class WorktreeProvider implements vscode.TreeDataProvider<WorktreeTreeItem> {
   private _onDidChangeTreeData = new vscode.EventEmitter<WorktreeTreeItem | undefined | null | void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+  private terminalTracker: TerminalTracker;
 
-  constructor(private gitService: GitService) {}
+  constructor(private gitService: GitService) {
+    this.terminalTracker = TerminalTracker.getInstance();
+
+    // Refresh when terminals change
+    this.terminalTracker.onDidChangeTerminals(() => {
+      this.refresh();
+    });
+  }
 
   /**
    * Refresh the tree view
@@ -129,11 +152,12 @@ export class WorktreeProvider implements vscode.TreeDataProvider<WorktreeTreeIte
       // Get all worktrees
       const worktrees = await this.gitService.listWorktrees();
 
-      // Enrich with change counts
+      // Enrich with change counts and active CLIs
       const enrichedWorktrees = await Promise.all(
         worktrees.map(async (wt) => {
           const changes = await this.gitService.getChangesCount(wt.path);
-          return { ...wt, changes };
+          const activeCLIs = this.terminalTracker.getActiveCLIs(wt.path);
+          return { ...wt, changes, activeCLIs };
         })
       );
 
