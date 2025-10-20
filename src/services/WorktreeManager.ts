@@ -106,7 +106,7 @@ export class WorktreeManager {
         async () => {
           const result = await this.gitService.removeWorktree(
             worktree.path,
-            hasChanges // Force if has changes
+            hasChanges ? true : false // Force if has changes
           );
 
           if (!result.success) {

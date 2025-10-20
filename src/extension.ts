@@ -26,7 +26,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Initialize TreeView
   const worktreeProvider = new WorktreeProvider(gitService);
-  const worktreeExplorer = new WorktreeExplorer(context, worktreeProvider);
+  new WorktreeExplorer(context, worktreeProvider);
 
   // Validate Git repository
   gitService.isGitRepository().then(isRepo => {

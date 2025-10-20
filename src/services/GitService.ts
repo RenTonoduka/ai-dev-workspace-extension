@@ -2,18 +2,13 @@
  * Git service for worktree operations using simple-git
  */
 
-import * as vscode from 'vscode';
-import simpleGit, { SimpleGit, GitError } from 'simple-git';
-import * as path from 'path';
-import * as fs from 'fs/promises';
+import simpleGit, { SimpleGit } from 'simple-git';
 import { WorktreeInfo, GitOperationResult } from '../types';
 
 export class GitService {
   private git: SimpleGit;
-  private rootPath: string;
 
   constructor(workspacePath: string) {
-    this.rootPath = workspacePath;
     this.git = simpleGit(workspacePath);
   }
 
