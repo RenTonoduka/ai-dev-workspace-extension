@@ -1,0 +1,232 @@
+{
+  "name": "ai-dev-workspace",
+  "displayName": "AI Dev Workspace",
+  "description": "Automate Git worktree creation and AI CLI integration for parallel development",
+  "version": "0.1.0",
+  "publisher": "tonodukaren",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "SCM Providers"
+  ],
+  "keywords": [
+    "git",
+    "worktree",
+    "ai",
+    "claude",
+    "codex",
+    "gemini",
+    "development"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "aiDevWorkspace.createWorktree",
+        "title": "AI Dev: Create Worktree",
+        "icon": "$(add)"
+      },
+      {
+        "command": "aiDevWorkspace.listWorktrees",
+        "title": "AI Dev: List Worktrees",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "aiDevWorkspace.removeWorktree",
+        "title": "AI Dev: Remove Worktree",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "aiDevWorkspace.openWorktreeTerminal",
+        "title": "AI Dev: Open Terminal in Worktree",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "aiDevWorkspace.startAICLI",
+        "title": "AI Dev: Start AI CLI",
+        "icon": "$(robot)"
+      },
+      {
+        "command": "aiDevWorkspace.refreshWorktrees",
+        "title": "AI Dev: Refresh Worktree List",
+        "icon": "$(refresh)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "aiDevWorkspace",
+          "title": "AI Dev Workspace",
+          "icon": "$(git-branch)"
+        }
+      ]
+    },
+    "views": {
+      "aiDevWorkspace": [
+        {
+          "id": "worktreeExplorer",
+          "name": "Worktrees",
+          "icon": "$(git-branch)",
+          "contextualTitle": "AI Dev Worktrees"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "aiDevWorkspace.createWorktree",
+          "when": "view == worktreeExplorer",
+          "group": "navigation@1"
+        },
+        {
+          "command": "aiDevWorkspace.refreshWorktrees",
+          "when": "view == worktreeExplorer",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "aiDevWorkspace.openWorktreeTerminal",
+          "when": "view == worktreeExplorer && viewItem == worktree",
+          "group": "inline@1"
+        },
+        {
+          "command": "aiDevWorkspace.startAICLI",
+          "when": "view == worktreeExplorer && viewItem == worktree",
+          "group": "inline@2"
+        },
+        {
+          "command": "aiDevWorkspace.removeWorktree",
+          "when": "view == worktreeExplorer && viewItem == worktree",
+          "group": "7_modification"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "aiDevWorkspace.createWorktree"
+        },
+        {
+          "command": "aiDevWorkspace.listWorktrees"
+        },
+        {
+          "command": "aiDevWorkspace.removeWorktree"
+        },
+        {
+          "command": "aiDevWorkspace.openWorktreeTerminal"
+        },
+        {
+          "command": "aiDevWorkspace.startAICLI"
+        },
+        {
+          "command": "aiDevWorkspace.refreshWorktrees"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "AI Dev Workspace",
+      "properties": {
+        "aiDevWorkspace.defaultWorktreeLocation": {
+          "type": "string",
+          "default": "../",
+          "description": "Default parent directory for new worktrees (relative to project root)"
+        },
+        "aiDevWorkspace.autoOpenNewWindow": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically open new VSCode window when creating worktree"
+        },
+        "aiDevWorkspace.autoStartTerminal": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically open terminal when creating worktree"
+        },
+        "aiDevWorkspace.cliTools": {
+          "type": "object",
+          "default": {
+            "claude": {
+              "command": "claude",
+              "args": [],
+              "enabled": true,
+              "env": {}
+            },
+            "aider": {
+              "command": "aider",
+              "args": [],
+              "enabled": true,
+              "env": {}
+            },
+            "gemini": {
+              "command": "gemini-cli",
+              "args": ["--model", "gemini-2.0-flash"],
+              "enabled": false,
+              "env": {}
+            }
+          },
+          "description": "Configuration for AI CLI tools",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "command": {
+                "type": "string",
+                "description": "CLI command to execute"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Command line arguments"
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "Enable this CLI tool"
+              },
+              "env": {
+                "type": "object",
+                "description": "Environment variables for this CLI"
+              }
+            }
+          }
+        },
+        "aiDevWorkspace.gitMinVersion": {
+          "type": "string",
+          "default": "2.30.0",
+          "description": "Minimum required Git version"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "@vscode/test-electron": "^2.3.8",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3",
+    "vsce": "^2.15.0"
+  },
+  "dependencies": {
+    "simple-git": "^3.21.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tonodukaren/ai-dev-workspace-extension"
+  },
+  "license": "MIT"
+}
